@@ -4,6 +4,7 @@ using Krypton.Lights;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using Microsoft.Xna.Framework.Input;
+using System.Collections.Generic;
 
 namespace KryptonTestbed
 {
@@ -21,8 +22,32 @@ namespace KryptonTestbed
         private Texture2D _lightTexture;
         private Light2D _light2D;
 
+        private SimpleCamera2D _camera;
+        private SpriteBatch spriteBatch;
+        private SpriteFont _font;
+
         public static Random Random = new Random();
         private readonly GraphicsDeviceManager _deviceManager;
+
+        #region Key definitions
+        private Dictionary<string, Keys> _keys = new Dictionary<string, Keys>
+        {
+            { "rotate camera left", Keys.Q },
+            { "rotate camera right", Keys.E },
+            { "randomize", Keys.R },
+            { "move light up", Keys.Up },
+            { "move light down", Keys.Down },
+            { "move light right", Keys.Right },
+            { "move light left", Keys.Left },
+            { "shadow type: solid", Keys.D1 },
+            { "shadow type: illuminated", Keys.D2 },
+            { "shadow type: occluded", Keys.D3 },
+            { "lower hull opacity", Keys.O },
+            { "increase hull opacity", Keys.P },
+            { "debug draw hulls", Keys.H },
+            { "debug draw lights", Keys.L },
+        };
+        #endregion
 
         public KryptonDemoGame()
         {
@@ -53,6 +78,9 @@ namespace KryptonTestbed
             _krypton.Initialize();
 
             base.Initialize();
+
+            // Create spritebatch
+            spriteBatch = new SpriteBatch(GraphicsDevice);
         }
 
         protected override void LoadContent()
@@ -76,6 +104,17 @@ namespace KryptonTestbed
             };
 
             _krypton.Lights.Add(_light2D);
+
+            // Create a camera
+            _camera = new SimpleCamera2D(
+                new Viewport(
+                    x: 0,
+                    y: 0,
+                    width: (int)(VerticalUnits * GraphicsDevice.Viewport.AspectRatio),
+                    height: (int)VerticalUnits));
+
+            // Load font
+            _font = Content.Load<SpriteFont>("font");
         }
 
         private void CreateLights(Texture2D texture, int count)
@@ -141,6 +180,9 @@ namespace KryptonTestbed
 
         protected override void Update(GameTime gameTime)
         {
+            // Update camera
+            _camera.Update(gameTime);
+
             const int speed = 5;
 
             // Make sure the user doesn't want to quit (but why would they?)
@@ -157,10 +199,10 @@ namespace KryptonTestbed
             }
 
             // make it much simpler to deal with the time :)
-            var t = (float) gameTime.ElapsedGameTime.TotalSeconds;
+            var deltaTime = (float) gameTime.ElapsedGameTime.TotalSeconds;
 
             // Allow for randomization of lights and hulls, to demonstrait that each hull and light is individually rendered
-            if (Keyboard.GetState().IsKeyDown(Keys.R))
+            if (Keyboard.GetState().IsKeyDown(_keys["randomize"]))
             {
                 // randomize lights
                 foreach (var light2D in _krypton.Lights)
@@ -172,68 +214,79 @@ namespace KryptonTestbed
                         continue;
                     }
 
-                    light.Position += Vector2.UnitY * (float)(Random.NextDouble() * 2 - 1) * t * speed;
-                    light.Position += Vector2.UnitX * (float)(Random.NextDouble() * 2 - 1) * t * speed;
-                    light.Angle -= MathHelper.TwoPi * (float)(Random.NextDouble() * 2 - 1) * t * speed;
+                    light.Position += Vector2.UnitY * (float)(Random.NextDouble() * 2 - 1) * deltaTime * speed;
+                    light.Position += Vector2.UnitX * (float)(Random.NextDouble() * 2 - 1) * deltaTime * speed;
+                    light.Angle -= MathHelper.TwoPi * (float)(Random.NextDouble() * 2 - 1) * deltaTime * speed;
                 }
 
                 // randomize hulls
                 foreach (var hull in _krypton.Hulls)
                 {
-                    hull.Position += Vector2.UnitY * (float)(Random.NextDouble() * 2 - 1) * t * speed;
-                    hull.Position += Vector2.UnitX * (float)(Random.NextDouble() * 2 - 1) * t * speed;
-                    hull.Angle -= MathHelper.TwoPi * (float)(Random.NextDouble() * 2 - 1) * t * speed;
+                    hull.Position += Vector2.UnitY * (float)(Random.NextDouble() * 2 - 1) * deltaTime * speed;
+                    hull.Position += Vector2.UnitX * (float)(Random.NextDouble() * 2 - 1) * deltaTime * speed;
+                    hull.Angle -= MathHelper.TwoPi * (float)(Random.NextDouble() * 2 - 1) * deltaTime * speed;
                 }
             }
 
             var keyboard = Keyboard.GetState();
 
             // Light Position Controls
-            if (keyboard.IsKeyDown(Keys.Up))
+            if (keyboard.IsKeyDown(_keys["move light up"]))
             {
-                _light2D.Y += t * speed;
+                _light2D.Y += deltaTime * speed;
             }
 
-            if (keyboard.IsKeyDown(Keys.Down))
+            if (keyboard.IsKeyDown(_keys["move light down"]))
             {
-                _light2D.Y -= t * speed;
+                _light2D.Y -= deltaTime * speed;
             }
 
-            if (keyboard.IsKeyDown(Keys.Right))
+            if (keyboard.IsKeyDown(_keys["move light right"]))
             {
-                _light2D.X += t * speed;
+                _light2D.X += deltaTime * speed;
             }
 
-            if (keyboard.IsKeyDown(Keys.Left))
+            if (keyboard.IsKeyDown(_keys["move light left"]))
             {
-                _light2D.X -= t * speed;
+                _light2D.X -= deltaTime * speed;
             }
+
+            var mouse = Mouse.GetState();
+            // Update camera's position
+            _camera.CenterOn(_light2D.Position);
+            //_camera.CenterOn(new Vector2(mouse.X, mouse.Y));
+
+            // Rotate camera
+            if (keyboard.IsKeyDown(_keys["rotate camera left"]))
+                _camera.Rotation -= MathHelper.TwoPi * deltaTime;
+            else if (keyboard.IsKeyDown(_keys["rotate camera right"]))
+                _camera.Rotation += MathHelper.TwoPi * deltaTime;
 
             // Shadow Type Controls
-            if (keyboard.IsKeyDown(Keys.D1))
+            if (keyboard.IsKeyDown(_keys["shadow type: solid"]))
             {
                 _light2D.ShadowType = ShadowType.Solid;
             }
 
-            if (keyboard.IsKeyDown(Keys.D2))
+            if (keyboard.IsKeyDown(_keys["shadow type: illuminated"]))
             {
                 _light2D.ShadowType = ShadowType.Illuminated;
             }
 
-            if (keyboard.IsKeyDown(Keys.D3))
+            if (keyboard.IsKeyDown(_keys["shadow type: occluded"]))
             {
                 _light2D.ShadowType = ShadowType.Occluded;
             }
-            
+
             // Shadow Opacity Controls
-            if (keyboard.IsKeyDown(Keys.O))
+            if (keyboard.IsKeyDown(_keys["lower hull opacity"]))
             {
-                _krypton.Hulls.ForEach(x => x.Opacity = MathHelper.Clamp(x.Opacity - t, 0, 1));
+                _krypton.Hulls.ForEach(x => x.Opacity = MathHelper.Clamp(x.Opacity - deltaTime, 0, 1));
             }
 
-            if (keyboard.IsKeyDown(Keys.P))
+            if (keyboard.IsKeyDown(_keys["increase hull opacity"]))
             {
-                _krypton.Hulls.ForEach(x => x.Opacity = MathHelper.Clamp(x.Opacity + t, 0, 1));
+                _krypton.Hulls.ForEach(x => x.Opacity = MathHelper.Clamp(x.Opacity + deltaTime, 0, 1));
             }
 
             base.Update(gameTime);
@@ -242,13 +295,9 @@ namespace KryptonTestbed
         protected override void Draw(GameTime gameTime)
         {
             // Create a world view projection matrix to use with krypton
-            var world = Matrix.Identity;
-            var view = Matrix.CreateTranslation(new Vector3(0, 0, 0) * -1f);
-            var projection = Matrix.CreateOrthographic(
-                width: VerticalUnits*GraphicsDevice.Viewport.AspectRatio,
-                height: VerticalUnits,
-                zNearPlane: 0,
-                zFarPlane: 1);
+            var world = _camera.World;
+            var view = _camera.Transformation;
+            var projection = _camera.Projection;
             var wvp = world * view * projection;
 
             // Assign the matrix and pre-render the lightmap.
@@ -270,19 +319,21 @@ namespace KryptonTestbed
             // Draw krypton (This can be omited if krypton is in the Component list. It will simply draw krypton when base.Draw is called
             _krypton.Draw(gameTime);
 
-            if (Keyboard.GetState().IsKeyDown(Keys.H))
+            if (Keyboard.GetState().IsKeyDown(_keys["debug draw hulls"]))
             {
                 // Draw hulls
                 DebugDrawHulls(false);
             }
 
-            if (Keyboard.GetState().IsKeyDown(Keys.L))
+            if (Keyboard.GetState().IsKeyDown(_keys["debug draw lights"]))
             {
                 // Draw hulls
                 DebugDrawLights();
             }
 
             base.Draw(gameTime);
+
+            DrawHelpText();
         }
 
         private void DebugDrawHulls(bool drawSolid)
@@ -339,7 +390,21 @@ namespace KryptonTestbed
                 effectPass.Apply();
                 _krypton.RenderHelper.BufferDraw();
             }
+        }
 
+        private void DrawHelpText()
+        {
+            spriteBatch.Begin();
+
+            var i = 0;
+            var textHeight = _font.MeasureString("A").Y;
+            foreach (var keyDef in _keys)
+            {
+                spriteBatch.DrawString(_font, $"{keyDef.Key} : {keyDef.Value}", new Vector2(0, i * textHeight), Color.White);
+                i++;
+            }
+
+            spriteBatch.End();
         }
     }
 }

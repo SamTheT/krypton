@@ -93,6 +93,7 @@
   <ItemGroup>
     <Compile Include="Program.cs" />
     <Compile Include="KryptonDemoGame.cs" />
+    <Compile Include="SimpleCamera2D.cs" />
   </ItemGroup>
   <ItemGroup>
     <Content Include="Game.ico" />
